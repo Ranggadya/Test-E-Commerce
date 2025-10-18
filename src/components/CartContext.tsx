@@ -12,21 +12,18 @@ import {
 import { useAuth } from "./AuthProvider";
 
 type CartProduct = {
-  id: number;
+  id: string;
   name: string;
   price: number;
-  imageUrl: string | null;
-  category: string;
-  stock: number;
-  slug: string;
+  imageUrl?: string | null;
 };
 
 type CartItem = {
-  id: number;
+  id: string;
   product: CartProduct;
   quantity: number;
-  size?: string | null;
   lineTotal: number;
+  size?: string | null;
 };
 
 type CartTotals = {
@@ -35,7 +32,7 @@ type CartTotals = {
 };
 
 type CartSummary = {
-  id: number | null;
+  id: string;
   items: CartItem[];
   totals: CartTotals;
 };
@@ -44,137 +41,117 @@ type CartContextValue = {
   cart: CartSummary | null;
   isLoading: boolean;
   error: string | null;
-  addItem: (payload: {
-    productId: number;
-    quantity: number;
-    size?: string;
-  }) => Promise<void>;
-  updateItemQuantity: (itemId: number, quantity: number) => Promise<void>;
-  removeItem: (itemId: number) => Promise<void>;
+  addItem: (payload: { productId: string; quantity: number }) => Promise<void>;
+  updateItemQuantity: (itemId: string, quantity: number) => Promise<void>;
+  removeItem: (itemId: string) => Promise<void>;
   clearCart: () => Promise<void>;
   refresh: () => Promise<void>;
 };
 
 const emptyCart: CartSummary = {
-  id: null,
+  id: "",
   items: [],
   totals: { subtotal: 0, totalItems: 0 },
 };
 
 const CartContext = createContext<CartContextValue | undefined>(undefined);
 
-type CartResponse = {
-  success: boolean;
-  data: { cart: CartSummary };
-};
-
-async function fetchJson<T>(url: string, init?: RequestInit) {
-  const res = await fetch(url, {
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
-    ...init,
-  });
-
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    const message =
-      body?.error?.message ??
-      body?.message ??
-      "Terjadi kesalahan pada server";
-    throw new Error(message);
-  }
-
-  return res.json() as Promise<T>;
-}
-
 export function CartProvider({ children }: { children: ReactNode }) {
-  const { user, isLoading: authLoading } = useAuth();
+  const { token, user, isLoading: authLoading } = useAuth();
   const [cart, setCart] = useState<CartSummary | null>(emptyCart);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const headers = useMemo(
+    () => ({
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    }),
+    [token]
+  );
+
   const loadCart = useCallback(async () => {
-    if (!user) {
+    if (!user || !token) {
       setCart(emptyCart);
-      setError(null);
-      setIsLoading(false);
       return;
     }
 
     setIsLoading(true);
-    setError(null);
     try {
-      const response = await fetchJson<CartResponse>("/api/cart");
-      setCart(response.data.cart);
+      const res = await fetch("/api/cart", { headers });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      setCart(data.data);
     } catch (err) {
-      setCart(emptyCart);
       setError(err instanceof Error ? err.message : "Gagal memuat keranjang");
+      setCart(emptyCart);
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  }, [user, token, headers]);
 
   useEffect(() => {
-    if (!authLoading) {
-      loadCart();
-    }
-  }, [authLoading, loadCart]);
+    if (!authLoading && user) loadCart();
+  }, [authLoading, user, loadCart]);
 
-  const ensureAuthenticated = useCallback(() => {
-    if (!user) {
-      throw new Error("Silakan login untuk mengakses keranjang.");
-    }
-  }, [user]);
+  const ensureAuth = useCallback(() => {
+    if (!token || !user) throw new Error("Silakan login untuk mengakses keranjang.");
+  }, [token, user]);
 
   const addItem = useCallback(
-    async (payload: { productId: number; quantity: number; size?: string }) => {
-      ensureAuthenticated();
-      setError(null);
-      await fetchJson<CartResponse>("/api/cart/items", {
+    async (payload: { productId: string; quantity: number }) => {
+      ensureAuth();
+      const res = await fetch("/api/cart", {
         method: "POST",
+        headers,
         body: JSON.stringify(payload),
       });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
       await loadCart();
     },
-    [ensureAuthenticated, loadCart]
+    [ensureAuth, headers, loadCart]
   );
 
   const updateItemQuantity = useCallback(
-    async (itemId: number, quantity: number) => {
-      ensureAuthenticated();
-      setError(null);
-      await fetchJson<CartResponse>(`/api/cart/items/${itemId}`, {
+    async (itemId: string, quantity: number) => {
+      ensureAuth();
+      const res = await fetch(`/api/cart/${itemId}`, {
         method: "PATCH",
+        headers,
         body: JSON.stringify({ quantity }),
       });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
       await loadCart();
     },
-    [ensureAuthenticated, loadCart]
+    [ensureAuth, headers, loadCart]
   );
 
   const removeItem = useCallback(
-    async (itemId: number) => {
-      ensureAuthenticated();
-      setError(null);
-      await fetchJson<CartResponse>(`/api/cart/items/${itemId}`, {
+    async (itemId: string) => {
+      ensureAuth();
+      const res = await fetch(`/api/cart/${itemId}`, {
         method: "DELETE",
+        headers,
       });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
       await loadCart();
     },
-    [ensureAuthenticated, loadCart]
+    [ensureAuth, headers, loadCart]
   );
 
   const clearCart = useCallback(async () => {
-    ensureAuthenticated();
-    setError(null);
-    await fetchJson<CartResponse>("/api/cart", {
+    ensureAuth();
+    const res = await fetch("/api/cart", {
       method: "DELETE",
+      headers,
     });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message);
     await loadCart();
-  }, [ensureAuthenticated, loadCart]);
+  }, [ensureAuth, headers, loadCart]);
 
   const value = useMemo<CartContextValue>(
     () => ({
@@ -195,8 +172,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
 export function useCart() {
   const context = useContext(CartContext);
-  if (!context) {
-    throw new Error("useCart must be used within CartProvider");
-  }
+  if (!context) throw new Error("useCart must be used within CartProvider");
   return context;
 }

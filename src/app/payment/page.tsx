@@ -60,7 +60,7 @@ export default function PaymentPage() {
     setFormError(null);
 
     try {
-      const response = await fetch("/api/orders", {
+      const orderRes = await fetch("/api/orders", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -73,22 +73,31 @@ export default function PaymentPage() {
         }),
       });
 
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        throw new Error(
-          body?.error?.message ?? body?.message ?? "Gagal membuat pesanan."
-        );
+      if (!orderRes.ok) {
+        const body = await orderRes.json().catch(() => ({}));
+        throw new Error(body?.error?.message ?? body?.message ?? "Gagal membuat pesanan.");
       }
 
-      await refresh();
-      setShowPopup(false);
-      router.push(`/payment/success?method=${encodeURIComponent(method)}`);
+      const { data: orderData } = await orderRes.json();
+      const payRes = await fetch(`/api/payment/${orderData.id}`, {
+        method: "POST",
+        credentials: "include",
+      });
+
+      if (!payRes.ok) {
+        const body = await payRes.json().catch(() => ({}));
+        throw new Error(body?.error?.message ?? body?.message ?? "Gagal memproses pembayaran.");
+      }
+
+      const { paymentUrl } = await payRes.json();
+      window.location.href = paymentUrl;
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "Gagal memproses pesanan.");
     } finally {
       setSubmitting(false);
     }
   };
+
 
   if (!user) {
     return (

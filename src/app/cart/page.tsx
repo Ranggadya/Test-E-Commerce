@@ -20,7 +20,7 @@ export default function CartPage() {
     clearCart,
   } = useCart();
 
-  const handleDecrease = async (itemId: number, current: number) => {
+  const handleDecrease = async (itemId: string, current: number) => {
     if (current <= 1) return;
     try {
       await updateItemQuantity(itemId, current - 1);
@@ -31,7 +31,7 @@ export default function CartPage() {
     }
   };
 
-  const handleIncrease = async (itemId: number, current: number) => {
+  const handleIncrease = async (itemId: string, current: number) => {
     try {
       await updateItemQuantity(itemId, current + 1);
     } catch (err) {
@@ -41,7 +41,7 @@ export default function CartPage() {
     }
   };
 
-  const handleRemove = async (itemId: number) => {
+  const handleRemove = async (itemId: string) => {
     if (!confirm("Hapus produk dari keranjang?")) return;
     try {
       await removeItem(itemId);

@@ -11,7 +11,7 @@ import {
 } from "react";
 
 type User = {
-  id: number;
+  id: string;
   name: string;
   email: string;
   role: "USER" | "ADMIN";
@@ -19,6 +19,7 @@ type User = {
 
 type AuthContextValue = {
   user: User | null;
+  token: string | null;
   isLoading: boolean;
   isAdmin: boolean;
   error: string | null;
@@ -39,87 +40,130 @@ async function fetchJson<T>(
   init?: RequestInit
 ): Promise<T> {
   const res = await fetch(input, {
-    credentials: "include",
     headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
     ...init,
   });
 
+  const body = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
     const message =
       body?.error?.message ?? body?.message ?? "Terjadi kesalahan pada server";
     throw new Error(message);
   }
 
-  return res.json();
+  return body;
 }
 
 type AuthResponse = {
   success: boolean;
-  data: { user: User };
+  data: { user: User; token: string };
 };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // 🔹 Ambil user & token dari localStorage saat load awal
+  useEffect(() => {
+    const savedUser = localStorage.getItem("user");
+    const savedToken = localStorage.getItem("token");
+
+    if (savedUser && savedToken) {
+      setUser(JSON.parse(savedUser));
+      setToken(savedToken);
+    }
+    setIsLoading(false);
+  }, []);
+
+  // 🔹 Load profil dari backend (opsional)
   const loadProfile = useCallback(async () => {
+    if (!token) return;
     setIsLoading(true);
     setError(null);
     try {
-      const result = await fetchJson<AuthResponse>("/api/auth/me");
+      const result = await fetchJson<{ success: boolean; data: { user: User } }>(
+        "/api/auth/me",
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
       setUser(result.data.user);
     } catch (err) {
+      console.error(err);
       setUser(null);
-      if (err instanceof Error && err.message !== "Belum login") {
-        setError(err.message);
-      }
+      setError(err instanceof Error ? err.message : "Gagal memuat profil");
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [token]);
 
-  useEffect(() => {
-    loadProfile();
-  }, [loadProfile]);
-
+  // 🔹 LOGIN
   const loginRequest = useCallback(
     async (payload: { email: string; password: string }) => {
       setError(null);
-      const result = await fetchJson<AuthResponse>("/api/auth/login", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
-      setUser(result.data.user);
+      setIsLoading(true);
+      try {
+        const result = await fetchJson<AuthResponse>("/api/auth/login", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+
+        const { user, token } = result.data;
+        setUser(user);
+        setToken(token);
+
+        localStorage.setItem("user", JSON.stringify(user));
+        localStorage.setItem("token", token);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Gagal login");
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
     },
     []
   );
 
+  // 🔹 REGISTER
   const registerRequest = useCallback(
     async (payload: { name: string; email: string; password: string }) => {
       setError(null);
-      const result = await fetchJson<AuthResponse>("/api/auth/register", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
-      setUser(result.data.user);
+      setIsLoading(true);
+      try {
+        const result = await fetchJson<AuthResponse>("/api/auth/register", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+
+        const { user, token } = result.data;
+        setUser(user);
+        setToken(token);
+
+        localStorage.setItem("user", JSON.stringify(user));
+        localStorage.setItem("token", token);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Gagal registrasi");
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
     },
     []
   );
 
+  // 🔹 LOGOUT
   const logoutRequest = useCallback(async () => {
     setError(null);
-    await fetchJson<{ success: boolean; data: { message: string } }>(
-      "/api/auth/logout",
-      { method: "POST" }
-    );
     setUser(null);
+    setToken(null);
+    localStorage.removeItem("user");
+    localStorage.removeItem("token");
   }, []);
 
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
+      token,
       isLoading,
       isAdmin: user?.role === "ADMIN",
       error,
@@ -128,7 +172,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logout: logoutRequest,
       refresh: loadProfile,
     }),
-    [user, isLoading, error, loginRequest, registerRequest, logoutRequest, loadProfile]
+    [user, token, isLoading, error, loginRequest, registerRequest, logoutRequest, loadProfile]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -6,6 +6,11 @@ import { BcryptUtil } from "@/lib/BcryptUtil";
 import { SignJWT, jwtVerify } from "jose";
 import { OAuth2Client } from "google-auth-library";
 import { UserRole } from "@prisma/client";
+import { NotFoundError } from "@/exceptions/NotFoundError";
+import { randomUUID } from "crypto";
+import { prisma } from "@/lib/prisma";
+
+
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 const JWT_SECRET = new TextEncoder().encode(
@@ -144,6 +149,50 @@ export class AuthService {
         imageUrl: user.image || null,
       },
       token,
+    };
+  }
+
+  async forgotPassword(email: string) {
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      throw new NotFoundError("Email tidak terdaftar");
+    }
+
+    await prisma.passwordResetToken.deleteMany({
+      where: { userId: user.id },
+    });
+
+    const resetToken = randomUUID();
+    const expires = new Date(Date.now() + 1000 * 60 * 15);
+
+    await prisma.passwordResetToken.create({
+      data: {
+        token: resetToken,
+        userId: user.id,
+        expiresAt: expires,
+      },
+    });
+
+    const resetLink = `${process.env.NEXT_PUBLIC_BASE_URL}/reset-password?token=${resetToken}`;
+    console.log("🔗 Reset link:", resetLink);
+    return {
+      resetLink,
+      message: "Link reset password telah dikirim ke email Anda.",
+    };
+  }
+
+  async getProfile(userId: string) {
+    const user = await this.userRepository.findById(userId);
+    if (!user) {
+      throw new NotFoundError("User tidak ditemukan");
+    }
+
+    return {
+      id: user.id,
+      name: user.name || "User",
+      email: user.email,
+      role: user.role,
+      imageUrl: user.image || null,
     };
   }
 }

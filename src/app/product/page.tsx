@@ -54,7 +54,7 @@ export default function ProductListPage() {
       setLoading(true);
       setError(null);
       try {
-        // Build query parameters - fetch all products (increase limit)
+
         const params = new URLSearchParams();
         params.append("page", "1");
         params.append("pageSize", "100"); // Fetch up to 100 products
