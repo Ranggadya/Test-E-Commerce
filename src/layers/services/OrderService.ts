@@ -2,7 +2,7 @@ import { OrderRepository } from "@/layers/repositories/OrderRepository";
 import { ProductRepository } from "@/layers/repositories/ProductRepostory";
 import { CartRepository } from "@/layers/repositories/CartRepostory";
 import { AppError } from "@/exceptions/AppError";
-import { OrderStatus, Prisma } from "@prisma/client";
+import { OrderStatus } from "@prisma/client";
 import { CreateOrderInput } from "@/types/OrderType";
 
 export class OrderService {
@@ -10,54 +10,40 @@ export class OrderService {
   private readonly productRepo = new ProductRepository();
   private readonly cartRepo = new CartRepository();
 
-  // 🔒 Definisi transisi status valid
   private readonly ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
     [OrderStatus.PENDING]: [OrderStatus.PROCESSING, OrderStatus.CANCELLED],
-    [OrderStatus.PROCESSING]: [OrderStatus.SHIPPED, OrderStatus.CANCELLED],
+    [OrderStatus.PROCESSING]: [OrderStatus.PAID, OrderStatus.CANCELLED],
+    [OrderStatus.PAID]: [OrderStatus.SHIPPED], // ✅ ditambahkan
     [OrderStatus.SHIPPED]: [OrderStatus.DELIVERED],
     [OrderStatus.DELIVERED]: [],
     [OrderStatus.CANCELLED]: [],
   };
 
-  /**
-   * 🧾 Ambil semua order milik user
-   */
   async listMine(userId: string, page = 1, limit = 20) {
-    if (!userId) throw new AppError("User ID is required", 400);
+    if (!userId) throw new AppError("User ID wajib diisi", 400);
     return this.orderRepo.findAllOrders(userId, page, limit);
   }
 
-  /**
-   * 🧾 Ambil semua order (admin)
-   */
   async listAll(page = 1, limit = 20, status?: OrderStatus) {
     return this.orderRepo.findAllOrders(undefined, page, limit, status);
   }
 
-  /**
-   * 🔍 Ambil detail 1 order berdasarkan ID
-   */
-  async get(id: string) {
-    if (!id) throw new AppError("Order ID is required", 400);
+  async get(orderId: string) {
+    if (!orderId) throw new AppError("Order ID wajib diisi", 400);
 
-    const order = await this.orderRepo.findOrderById(id);
-    if (!order) throw new AppError("Order not found", 404);
+    const order = await this.orderRepo.findOrderById(orderId);
+    if (!order) throw new AppError("Pesanan tidak ditemukan", 404);
 
     return order;
   }
 
-  /**
-   * 💳 Checkout: buat pesanan baru dari isi keranjang user
-   */
   async checkout(userId: string, orderData: CreateOrderInput) {
-    if (!userId) throw new AppError("User ID is required", 400);
+    if (!userId) throw new AppError("User ID wajib diisi", 400);
 
     const cart = await this.cartRepo.findByUserId(userId);
-    if (!cart || cart.items.length === 0) {
-      throw new AppError("Your cart is empty", 400);
-    }
+    if (!cart || cart.items.length === 0)
+      throw new AppError("Keranjang Anda kosong", 400);
 
-    // 🔎 Validasi stok semua produk sekaligus
     const productIds = cart.items.map((item) => item.productId);
     const products = await Promise.all(
       productIds.map((id) => this.productRepo.findById(id))
@@ -66,15 +52,12 @@ export class OrderService {
     for (let i = 0; i < cart.items.length; i++) {
       const item = cart.items[i];
       const product = products[i];
-      if (!product) {
-        throw new AppError(`Product not found: ${item.productId}`, 404);
-      }
-      if (product.stock < item.quantity) {
-        throw new AppError(`Insufficient stock for ${product.name}`, 400);
-      }
+      if (!product)
+        throw new AppError(`Produk tidak ditemukan: ${item.productId}`, 404);
+      if (product.stock < item.quantity)
+        throw new AppError(`Stok tidak mencukupi untuk ${product.name}`, 400);
     }
 
-    // 🧮 Siapkan daftar item & total
     const items = cart.items.map((it) => ({
       productId: it.productId,
       quantity: it.quantity,
@@ -86,7 +69,6 @@ export class OrderService {
       0
     );
 
-    // 🧾 Buat order baru
     const order = await this.orderRepo.createOrder(
       userId,
       orderData,
@@ -94,41 +76,35 @@ export class OrderService {
       totalAmount
     );
 
-    // 📉 Kurangi stok produk secara atomik
     await Promise.all(
       order.items.map((item) =>
         this.productRepo.adjustStock(item.productId, -item.quantity)
       )
     );
 
-    // 🗑️ Kosongkan keranjang setelah berhasil checkout
     await this.cartRepo.clear(cart.id);
 
     return {
-      message: "Order successfully created",
+      message: "Pesanan berhasil dibuat",
       order,
     };
   }
 
-  /**
-   * ⚙️ Update status order (admin)
-   */
-  async updateStatus(id: string, status: OrderStatus) {
-    if (!id) throw new AppError("Order ID is required", 400);
+  async updateStatus(orderId: string, newStatus: OrderStatus) {
+    if (!orderId) throw new AppError("Order ID wajib diisi", 400);
 
-    const order = await this.orderRepo.findOrderById(id);
-    if (!order) throw new AppError("Order not found", 404);
+    const order = await this.orderRepo.findOrderById(orderId);
+    if (!order) throw new AppError("Pesanan tidak ditemukan", 404);
 
-    const allowed = this.ALLOWED_TRANSITIONS[order.status];
-    if (!allowed.includes(status)) {
+    const allowedTransitions = this.ALLOWED_TRANSITIONS[order.status];
+    if (!allowedTransitions.includes(newStatus)) {
       throw new AppError(
-        `Invalid status transition: ${order.status} → ${status}`,
+        `Perubahan status tidak valid: ${order.status} → ${newStatus}`,
         400
       );
     }
 
-    // 🔁 Jika dibatalkan → kembalikan stok
-    if (status === OrderStatus.CANCELLED) {
+    if (newStatus === OrderStatus.CANCELLED) {
       await Promise.all(
         order.items.map((item) =>
           this.productRepo.adjustStock(item.productId, item.quantity)
@@ -136,9 +112,10 @@ export class OrderService {
       );
     }
 
-    const updatedOrder = await this.orderRepo.updateStatus(id, status);
+    const updatedOrder = await this.orderRepo.updateStatus(orderId, newStatus);
+
     return {
-      message: `Order status updated to ${status}`,
+      message: `Status pesanan berhasil diubah menjadi ${newStatus}`,
       order: updatedOrder,
     };
   }
