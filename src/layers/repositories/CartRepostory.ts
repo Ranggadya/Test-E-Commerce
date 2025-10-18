@@ -1,4 +1,4 @@
-import { prisma } from '@/lib/prisma';
+import { prisma } from "@/lib/prisma";
 
 export class CartRepository {
   async findByUserId(userId: string) {
@@ -36,7 +36,21 @@ export class CartRepository {
     });
   }
 
-  async addItem(cartId: string, productId: string, quantity: number) {
+  async getOrCreateCart(userId: string) {
+    let cart = await this.findByUserId(userId);
+    if (!cart) cart = await this.createCart(userId);
+    return cart;
+  }
+
+  /**
+   * Tambah item ke keranjang (atau update jika sudah ada)
+   */
+  async upsertItem(
+    cartId: string,
+    productId: string,
+    priceSnap: number,
+    quantity: number
+  ) {
     return prisma.cartItem.upsert({
       where: {
         cartId_productId: { cartId, productId },
@@ -45,6 +59,7 @@ export class CartRepository {
         cartId,
         productId,
         quantity,
+        priceSnap,
       },
       update: {
         quantity: { increment: quantity },
@@ -55,18 +70,24 @@ export class CartRepository {
     });
   }
 
-  async updateItemQuantity(cartId: string, productId: string, quantity: number) {
+  async setItemQuantity(cartId: string, itemId: string, quantity: number) {
+    if (quantity <= 0) {
+      // hapus item kalau quantity 0
+      return prisma.cartItem.delete({
+        where: { id: itemId },
+      });
+    }
+
     return prisma.cartItem.update({
-      where: {
-        cartId_productId: { cartId, productId },
-      },
+      where: { id: itemId },
       data: { quantity },
-      include: {
-        product: true,
-      },
+      include: { product: true },
     });
   }
 
+  /**
+   * Hapus item berdasarkan cartId + productId
+   */
   async removeItem(cartId: string, productId: string) {
     return prisma.cartItem.delete({
       where: {
@@ -75,7 +96,10 @@ export class CartRepository {
     });
   }
 
-  async clearCart(cartId: string) {
+  /**
+   * Kosongkan semua item dari keranjang
+   */
+  async clear(cartId: string) {
     return prisma.cartItem.deleteMany({
       where: { cartId },
     });

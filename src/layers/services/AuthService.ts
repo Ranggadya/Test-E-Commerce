@@ -1,15 +1,15 @@
-import { ConflictError } from '@/exceptions/ConflictError';
-import { UnauthorizedError } from '@/exceptions/UnauthorizedError';
-import { UserRepository } from '@/layers/repositories/UserRepostory';
-import { RegisterInput, LoginInput, UserPayload } from '@/types/UserType';
-import { BcryptUtil } from '@/lib/BcryptUtil';
-import { SignJWT, jwtVerify } from 'jose';
-import { OAuth2Client } from 'google-auth-library';
-import { UserRole } from '@prisma/client';
+import { ConflictError } from "@/exceptions/ConflictError";
+import { UnauthorizedError } from "@/exceptions/UnauthorizedError";
+import { UserRepository } from "@/layers/repositories/UserRepostory";
+import { RegisterInput, LoginInput, UserPayload } from "@/types/UserType";
+import { BcryptUtil } from "@/lib/BcryptUtil";
+import { SignJWT, jwtVerify } from "jose";
+import { OAuth2Client } from "google-auth-library";
+import { UserRole } from "@prisma/client";
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || 'your-secret-key-change-in-production'
+  process.env.JWT_SECRET || "your-secret-key-change-in-production"
 );
 
 export class AuthService {
@@ -21,9 +21,7 @@ export class AuthService {
 
   async register(data: RegisterInput) {
     const existingUser = await this.userRepository.findByEmail(data.email);
-    if (existingUser) {
-      throw new ConflictError('User dengan email ini sudah terdaftar');
-    }
+    if (existingUser) throw new ConflictError("User dengan email ini sudah terdaftar");
 
     const hashedPassword = data.password
       ? await BcryptUtil.hashPassword(data.password)
@@ -36,10 +34,10 @@ export class AuthService {
     });
 
     const token = await this.generateToken({
-      id: user.id,
-      email: user.email,
-      name: user.name || 'User',
+      userId: user.id,
       role: user.role,
+      email: user.email,
+      name: user.name || "User",
       imageUrl: user.image || null,
     });
 
@@ -47,7 +45,7 @@ export class AuthService {
       user: {
         id: user.id,
         email: user.email,
-        name: user.name || 'User',
+        name: user.name || "User",
         role: user.role,
         imageUrl: user.image || null,
       },
@@ -58,23 +56,17 @@ export class AuthService {
   async login(data: LoginInput) {
     const user = await this.userRepository.findByEmail(data.email);
     if (!user || !user.password) {
-      throw new UnauthorizedError('Email atau password salah');
+      throw new UnauthorizedError("Email atau password salah");
     }
 
-    const isPasswordValid = await BcryptUtil.comparePassword(
-      data.password,
-      user.password
-    );
-
-    if (!isPasswordValid) {
-      throw new UnauthorizedError('Email atau password salah');
-    }
+    const isValid = await BcryptUtil.comparePassword(data.password, user.password);
+    if (!isValid) throw new UnauthorizedError("Email atau password salah");
 
     const token = await this.generateToken({
-      id: user.id,
-      email: user.email,
-      name: user.name || 'User',
+      userId: user.id,
       role: user.role,
+      email: user.email,
+      name: user.name || "User",
       imageUrl: user.image || null,
     });
 
@@ -82,7 +74,7 @@ export class AuthService {
       user: {
         id: user.id,
         email: user.email,
-        name: user.name || 'User',
+        name: user.name || "User",
         role: user.role,
         imageUrl: user.image || null,
       },
@@ -93,17 +85,23 @@ export class AuthService {
   async verifyToken(token: string): Promise<UserPayload> {
     try {
       const { payload } = await jwtVerify(token, JWT_SECRET);
-      return payload as unknown as UserPayload;
-    } catch (error) {
-      throw new UnauthorizedError('Token tidak valid atau sudah kadaluarsa');
+      const data = payload as unknown as UserPayload;
+
+      if (!data.userId || !data.role) {
+        throw new UnauthorizedError("Token tidak valid atau rusak");
+      }
+
+      return data;
+    } catch {
+      throw new UnauthorizedError("Token tidak valid atau sudah kadaluarsa");
     }
   }
 
   private async generateToken(payload: UserPayload): Promise<string> {
     return new SignJWT({ ...payload })
-      .setProtectedHeader({ alg: 'HS256' })
+      .setProtectedHeader({ alg: "HS256" })
       .setIssuedAt()
-      .setExpirationTime('7d')
+      .setExpirationTime("7d") // 7 hari
       .sign(JWT_SECRET);
   }
 
@@ -115,26 +113,25 @@ export class AuthService {
 
     const payload = ticket.getPayload();
     if (!payload || !payload.email) {
-      throw new UnauthorizedError('Token Google tidak valid');
+      throw new UnauthorizedError("Token Google tidak valid");
     }
-
     let user = await this.userRepository.findByEmail(payload.email);
 
     if (!user) {
       user = await this.userRepository.create({
-        name: payload.name || 'User Google',
+        name: payload.name || "User Google",
         email: payload.email,
-        password: undefined, 
+        password: undefined,
         role: UserRole.USER,
         imageUrl: payload.picture || null,
       });
     }
 
     const token = await this.generateToken({
-      id: user.id,
-      email: user.email,
-      name: user.name || 'User',
+      userId: user.id,
       role: user.role,
+      email: user.email,
+      name: user.name || "User",
       imageUrl: user.image || null,
     });
 
@@ -142,7 +139,7 @@ export class AuthService {
       user: {
         id: user.id,
         email: user.email,
-        name: user.name || 'User',
+        name: user.name || "User",
         role: user.role,
         imageUrl: user.image || null,
       },

@@ -18,6 +18,7 @@ enum OrderStatus {
   SHIPPED
   DELIVERED
   CANCELLED
+  PAID 
 }
 
 model User {
@@ -120,6 +121,7 @@ model CartItem {
   quantity  Int      @default(1)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  priceSnap Decimal 
 
   cart    Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -135,10 +137,11 @@ model Order {
   userId          String
   orderNumber     String      @unique
   status          OrderStatus @default(PENDING)
-  totalAmount     Decimal     @db.Decimal(10, 2)
+  totalAmount     Decimal     
   shippingAddress String
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
+  paymentUrl   String?
 
   user  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   items OrderItem[]
@@ -154,7 +157,7 @@ model OrderItem {
   orderId   String
   productId String
   quantity  Int
-  price     Decimal  @db.Decimal(10, 2)
+  price     Decimal 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

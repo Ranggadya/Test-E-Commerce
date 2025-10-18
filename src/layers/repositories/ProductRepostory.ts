@@ -101,7 +101,7 @@ export class ProductRepository {
   async delete(id: string) {
     return prisma.product.update({
       where: { id },
-      data: { isActive: false }, // Soft delete
+      data: { isActive: false }, 
     });
   }
 
@@ -131,7 +131,6 @@ export class ProductRepository {
       });
       return updated;
     } catch (err) {
-      // Jika gagal (misal concurrent modification), return null
       return null;
     }
   }

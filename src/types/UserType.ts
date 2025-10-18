@@ -2,10 +2,10 @@ import { UserRole } from '@prisma/client';
 
 export interface RegisterInput {
   email: string;
-  password?: string | null;           // optional untuk login Google
-  name?: string;               // optional jika nama tidak tersedia dari Google
-  role?: UserRole;             // optional, default USER
-  imageUrl?: string | null;    // untuk profile picture dari Google
+  password?: string | null;
+  name?: string;
+  role?: UserRole;
+  imageUrl?: string | null;    
 }
 
 export interface LoginInput {
@@ -14,9 +14,9 @@ export interface LoginInput {
 }
 
 export interface UserPayload {
-  id: string;
+  userId: string;
   email: string;
   name: string;
   role: UserRole;
-  imageUrl?: string | null;    // tambahkan jika ingin bisa dipakai di JWT
+  imageUrl?: string | null;
 }

@@ -7,7 +7,6 @@ const authController = new AuthController();
 
 export async function POST(request: NextRequest) {
   try {
-    // Jangan baca request.json() di sini, biarkan controller yang menangani
     return await authController.login(request);
   } catch (error) {
     return handleError(error);

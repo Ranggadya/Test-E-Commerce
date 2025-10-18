@@ -1,4 +1,4 @@
-// src/validators/ProductValidator.ts
+
 import { z } from 'zod';
 
 // Create Product
@@ -16,7 +16,6 @@ export const createProductSchema = z.object({
   categoryId: z.string().uuid('Invalid category ID'),
 });
 
-// Update Product
 export const updateProductSchema = z.object({
   name: z.string().min(3).max(255).optional(),
   slug: z.string().min(3).max(255).regex(/^[a-z0-9-]+$/).optional(),
@@ -28,7 +27,6 @@ export const updateProductSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
-// Product Filter
 export const productFilterSchema = z
   .object({
     search: z.string().optional(),

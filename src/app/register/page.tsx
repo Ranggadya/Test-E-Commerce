@@ -1,140 +1,134 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { FormEvent, useEffect, useState } from "react";
+import { useAuth } from "@/components/AuthProvider";
+import PasswordStrengthMeter from "@/components/PasswordStrengthMeter";
 
 export default function RegisterPage() {
-    const router = useRouter();
+  const { register, error, user, isLoading } = useAuth();
+  const router = useRouter();
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
-    const [formData, setFormData] = useState({
-        name: "",
-        email: "",
-        password: "",
-    });
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState("");
-    const [success, setSuccess] = useState("");
+  useEffect(() => {
+    if (!isLoading && user) {
+      router.replace("/");
+    }
+  }, [isLoading, user, router]);
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setFormData({
-            ...formData,
-            [e.target.name]: e.target.value,
-        });
-    };
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setFormError(null);
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setLoading(true);
-        setError("");
-        setSuccess("");
+    if (!name || !email || !password) {
+      setFormError("Semua field wajib diisi.");
+      return;
+    }
 
-        try {
-            const res = await fetch("/api/auth/register", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(formData),
-            });
+    try {
+      setSubmitting(true);
+      await register({ name, email, password });
+      router.push("/");
+    } catch (err) {
+      if (err instanceof Error) {
+        setFormError(err.message);
+      } else {
+        setFormError("Gagal mendaftar. Coba lagi.");
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
-            const data = await res.json();
+  if (!isLoading && user) {
+    return null;
+  }
 
-            if (!res.ok) {
-                throw new Error(data.message || "Gagal mendaftar");
-            }
+  return (
+    <section
+      className="min-h-screen flex items-center justify-center bg-cover bg-center px-6"
+      style={{ backgroundImage: "url('/sepatu12.jpeg')" }}
+    >
+      <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-lg bg-opacity-95">
+        <h2 className="text-2xl font-bold text-gray-900 text-center">Daftar</h2>
+        <p className="text-gray-600 text-center mt-2">
+          Buat akun baru untuk mulai belanja di Shoes4U
+        </p>
 
-            setSuccess("Registrasi berhasil! Mengarahkan ke halaman login...");
-            setTimeout(() => router.push("/login"), 1500);
-        } catch (err) {
-            if (err instanceof Error) {
-                setError(err.message);
-            } else {
-                setError("Terjadi kesalahan saat registrasi.");
-            }
-        } finally {
-            setLoading(false);
-        }
-    };
+        <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Nama Lengkap
+            </label>
+            <input
+              type="text"
+              placeholder="Nama Lengkap"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="mt-1 w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-black outline-none"
+              required
+            />
+          </div>
 
-    return (
-        <section
-            className="min-h-screen flex items-center justify-center bg-cover bg-center px-6"
-            style={{ backgroundImage: "url('/sepatu12.jpeg')" }}
-        >
-            <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-lg bg-opacity-95">
-                <h2 className="text-2xl font-bold text-gray-900 text-center">Daftar</h2>
-                <p className="text-gray-600 text-center mt-2">
-                    Buat akun baru untuk mulai belanja di Shoes4U
-                </p>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Email
+            </label>
+            <input
+              type="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="mt-1 w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-black outline-none"
+              required
+            />
+          </div>
 
-                <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">
-                            Nama Lengkap
-                        </label>
-                        <input
-                            type="text"
-                            name="name"
-                            placeholder="Nama Lengkap"
-                            value={formData.name}
-                            onChange={handleChange}
-                            className="mt-1 w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-black outline-none"
-                            required
-                        />
-                    </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Password
+            </label>
+            <input
+              type="password"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="mt-1 w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-black outline-none"
+              required
+            />
+            <PasswordStrengthMeter password={password} showRequirements />
+          </div>
 
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">
-                            Email
-                        </label>
-                        <input
-                            type="email"
-                            name="email"
-                            placeholder="you@example.com"
-                            value={formData.email}
-                            onChange={handleChange}
-                            className="mt-1 w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-black outline-none"
-                            required
-                        />
-                    </div>
+          {(formError || error) && (
+            <p className="text-sm text-red-600">
+              {formError || error || "Terjadi kesalahan"}
+            </p>
+          )}
 
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">
-                            Password
-                        </label>
-                        <input
-                            type="password"
-                            name="password"
-                            placeholder="••••••••"
-                            value={formData.password}
-                            onChange={handleChange}
-                            className="mt-1 w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-black outline-none"
-                            required
-                        />
-                    </div>
+          <button
+            type="submit"
+            className="w-full py-3 bg-black text-white rounded-lg shadow hover:bg-gray-800 transition disabled:opacity-60"
+            disabled={submitting}
+          >
+            {submitting ? "Memproses..." : "Daftar"}
+          </button>
+        </form>
 
-                    {error && (
-                        <p className="text-red-500 text-sm text-center">{error}</p>
-                    )}
-                    {success && (
-                        <p className="text-green-600 text-sm text-center">{success}</p>
-                    )}
-
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="w-full py-3 bg-black text-white rounded-lg shadow hover:bg-gray-800 transition disabled:opacity-50"
-                    >
-                        {loading ? "Mendaftar..." : "Daftar"}
-                    </button>
-                </form>
-
-                <p className="text-sm text-gray-600 mt-6 text-center">
-                    Sudah punya akun?{" "}
-                    <Link href="/login" className="text-black font-medium hover:underline">
-                        Login
-                    </Link>
-                </p>
-            </div>
-        </section>
-    );
+        <p className="text-sm text-gray-600 mt-6 text-center">
+          Sudah punya akun?{" "}
+          <Link
+            href="/login"
+            className="text-black font-medium hover:underline"
+          >
+            Login
+          </Link>
+        </p>
+      </div>
+    </section>
+  );
 }

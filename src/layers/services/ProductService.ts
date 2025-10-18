@@ -1,7 +1,22 @@
-import { ProductRepository } from '../repositories/ProductRepostory';
-import { ProductCreateInput, ProductUpdateInput, ProductFilterInput } from '@/types/ProductType';
-import { NotFoundError } from '@/exceptions/NotFoundError';
-import { ForbiddenError } from '@/exceptions/ForbidenError';
+import { ProductRepository } from "@/layers/repositories/ProductRepostory";
+import { ProductCreateInput, ProductUpdateInput, ProductFilterInput } from "@/types/ProductType";
+import { NotFoundError } from "@/exceptions/NotFoundError";
+import { ForbiddenError } from "@/exceptions/ForbidenError";
+import { Prisma } from "@prisma/client";
+import { Product } from "@prisma/client";
+import { uploadProductImage } from "@/lib/uploadSupabase";
+
+interface PaginationMeta {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+interface PaginatedProducts {
+  products: Product[];
+  meta: PaginationMeta;
+}
 
 export class ProductService {
   private productRepository: ProductRepository;
@@ -10,74 +25,140 @@ export class ProductService {
     this.productRepository = new ProductRepository();
   }
 
-  async getAllProducts(filter?: ProductFilterInput & { page?: number; limit?: number }) {
-    const result = await this.productRepository.findAll(filter);
-    
+  // =============================
+  // 🔹 Get All Products (with filter + pagination)
+  // =============================
+  async getAllProducts(
+    filter?: ProductFilterInput & { page?: number; limit?: number }
+  ): Promise<{ success: boolean; data: PaginatedProducts }> {
+    const page = filter?.page ?? 1;
+    const limit = filter?.limit ?? 10;
+
+    const result = await this.productRepository.findAll({ ...filter, page, limit });
+
     return {
-      products: result.products,
-      meta: {
-        page: result.page,
-        limit: result.limit,
-        total: result.total,
-        totalPages: Math.ceil(result.total / (result.limit || 1)),
+      success: true,
+      data: {
+        products: result.products,
+        meta: {
+          page: result.page,
+          limit: result.limit,
+          total: result.total,
+          totalPages: Math.ceil(result.total / result.limit),
+        },
       },
     };
   }
 
-  async getProductById(id: number) {
+  // =============================
+  // 🔹 Get Product by ID
+  // =============================
+  async getProductById(id: string): Promise<{ success: boolean; data: Product }> {
     const product = await this.productRepository.findById(id);
-    
-    if (!product) {
-      throw new NotFoundError('Product');
-    }
+    if (!product) throw new NotFoundError("Product");
 
-    return product;
+    return { success: true, data: product };
   }
 
-  async getProductBySlug(slug: string) {
+  // =============================
+  // 🔹 Get Product by Slug
+  // =============================
+  async getProductBySlug(slug: string): Promise<{ success: boolean; data: Product }> {
     const product = await this.productRepository.findBySlug(slug);
-    
-    if (!product) {
-      throw new NotFoundError('Product');
-    }
+    if (!product) throw new NotFoundError("Product");
 
-    return product;
+    return { success: true, data: product };
   }
 
-  async createProduct(data: ProductCreateInput) {
-    // Check if slug already exists
+  // =============================
+  // 🔹 Create Product (with optional image upload)
+  // =============================
+
+async createProduct(
+    data: ProductCreateInput,
+    imageFile ?: File
+  ): Promise < { success: boolean; message: string; data: Product } > {
     const existingProduct = await this.productRepository.findBySlug(data.slug);
-    if (existingProduct) {
-      throw new ForbiddenError('Product with this slug already exists');
+    if(existingProduct) {
+      throw new ForbiddenError("Product with this slug already exists");
     }
 
-    return this.productRepository.create(data);
-  }
-
-  async updateProduct(id: number, data: ProductUpdateInput) {
-    const existingProduct = await this.productRepository.findById(id);
-    if (!existingProduct) {
-      throw new NotFoundError('Product');
+  let imageUrl: string | undefined;
+    if(imageFile) {
+      imageUrl = await uploadProductImage(imageFile);
     }
+  try {
+      const product = await this.productRepository.create({
+        ...data,
+        imageUrl,
+      });
 
-    // Check if new slug conflicts with another product
-    if (data.slug && data.slug !== existingProduct.slug) {
-      const slugExists = await this.productRepository.findBySlug(data.slug);
-      if (slugExists) {
-        throw new ForbiddenError('Product with this slug already exists');
+      return {
+        success: true,
+        message: "Product created successfully",
+        data: product,
+      };
+    } catch(err: unknown) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === "P2002"
+      ) {
+        throw new ForbiddenError("Slug must be unique");
       }
-    }
+      if (err instanceof Error) {
+        throw err;
+      }
 
-    return this.productRepository.update(id, data);
+      throw new Error("Unexpected error while creating product");
+    }
   }
 
-  async deleteProduct(id: number) {
-    const product = await this.productRepository.findById(id);
-    if (!product) {
-      throw new NotFoundError('Product');
-    }
 
-    await this.productRepository.delete(id);
-    return { message: 'Product deleted successfully' };
+  // =============================
+  // 🔹 Update Product (with optional image upload)
+  // =============================
+  async updateProduct(
+    id: string,
+    data: ProductUpdateInput,
+    imageFile ?: File
+  ): Promise < { success: boolean; message: string; data: Product } > {
+    const existingProduct = await this.productRepository.findById(id);
+    if(!existingProduct) throw new NotFoundError("Product");
+
+    if(data.slug && data.slug !== existingProduct.slug) {
+  const slugExists = await this.productRepository.findBySlug(data.slug);
+  if (slugExists) throw new ForbiddenError("Product with this slug already exists");
+}
+
+let imageUrl: string | undefined;
+if (imageFile) {
+  imageUrl = await uploadProductImage(imageFile);
+}
+
+const updated = await this.productRepository.update(id, {
+  ...data,
+  ...(imageUrl ? { imageUrl } : {}),
+});
+
+return {
+  success: true,
+  message: "Product updated successfully",
+  data: updated,
+};
   }
+
+  // =============================
+  // 🔹 Soft Delete Product
+  // =============================
+  async deleteProduct(id: string): Promise < { success: boolean; message: string } > {
+  const product = await this.productRepository.findById(id);
+  if(!product) throw new NotFoundError("Product");
+
+  await this.productRepository.delete(id);
+
+  return {
+    success: true,
+    message: "Product deleted successfully",
+  };
+}
 }
