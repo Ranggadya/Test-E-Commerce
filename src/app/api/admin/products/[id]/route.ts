@@ -5,10 +5,6 @@ import { handleError } from "@/exceptions/handlerError";
 
 const controller = new ProductController();
 
-/**
- * PATCH /api/admin/products/:id
- * ✅ Update data produk (admin only)
- */
 export const PATCH = async (
   req: NextRequest,
   context: { params: { id: string } }
@@ -22,10 +18,6 @@ export const PATCH = async (
   }
 };
 
-/**
- * DELETE /api/admin/products/:id
- * ✅ Menghapus produk (admin only)
- */
 export const DELETE = async (
   req: NextRequest,
   context: { params: { id: string } }

@@ -4,11 +4,6 @@ import { requireAdmin } from "@/lib/auth";
 import { handleError } from "@/exceptions/handlerError";
 
 const controller = new ProductController();
-
-/**
- * GET /api/admin/products
- * ✅ Mendapatkan semua produk (admin only)
- */
 export const GET = async (req: NextRequest): Promise<Response> => {
   try {
     await requireAdmin(req);
@@ -18,10 +13,6 @@ export const GET = async (req: NextRequest): Promise<Response> => {
   }
 };
 
-/**
- * POST /api/admin/products
- * ✅ Membuat produk baru (admin only)
- */
 export const POST = async (req: NextRequest): Promise<Response> => {
   try {
     await requireAdmin(req);
