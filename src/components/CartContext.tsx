@@ -41,7 +41,7 @@ type CartContextValue = {
   cart: CartSummary | null;
   isLoading: boolean;
   error: string | null;
-  addItem: (payload: { productId: string; quantity: number }) => Promise<void>;
+  addItem: (payload: { productId: string; quantity: number; size?: string | null }) => Promise<void>;
   updateItemQuantity: (itemId: string, quantity: number) => Promise<void>;
   removeItem: (itemId: string) => Promise<void>;
   clearCart: () => Promise<void>;
