@@ -33,11 +33,11 @@ model User {
   image     String?
 
   // 🔹 Relasi
-  accounts Account[]
-  sessions Session[]
-  cart     Cart?
-  orders   Order[]
-  wishlist Wishlist[]
+  accounts            Account[]
+  sessions            Session[]
+  cart                Cart?
+  orders              Order[]
+  wishlist            Wishlist[]
   passwordResetTokens PasswordResetToken[]
 
   @@map("users")
@@ -127,7 +127,7 @@ model CartItem {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   priceSnap Decimal
-  size       String?
+  size      String?
 
   cart    Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -139,29 +139,29 @@ model CartItem {
 }
 
 model Order {
-  id                 String           @id @default(uuid())  
+  id                 String      @id @default(uuid())
   orderNumber        String
   userId             String
-  user               User             @relation(fields: [userId], references: [id])
-  status             String           @default("PENDING")
-  totalAmount              Float
+  user               User        @relation(fields: [userId], references: [id])
+  status             String      @default("PENDING")
+  totalAmount        Float
   shippingAddress    String?
   shippingCity       String?
   shippingPostalCode String?
   shippingPhone      String?
   paymentMethod      String?
-  createdAt          DateTime         @default(now())
-  updatedAt          DateTime         @updatedAt
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
   items              OrderItem[]
   paymentUrl         String?
 }
 
 model OrderItem {
-  id        String    @id @default(uuid())  
+  id        String  @id @default(uuid())
   orderId   String
-  order     Order     @relation(fields: [orderId], references: [id])
+  order     Order   @relation(fields: [orderId], references: [id])
   productId String
-  product   Product   @relation(fields: [productId], references: [id])
+  product   Product @relation(fields: [productId], references: [id])
   quantity  Int
   price     Float
   size      String?
@@ -188,4 +188,3 @@ model PasswordResetToken {
   expiresAt DateTime
   createdAt DateTime @default(now())
 }
-

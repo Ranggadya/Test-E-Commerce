@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 
 interface Product {
-  id: number;
+  id: string;
   name: string;
   category: string;
   price: number;
@@ -48,7 +48,7 @@ export default function AdminProductPage() {
   const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
-  
+
   // Form states
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
@@ -56,13 +56,13 @@ export default function AdminProductPage() {
   const [stock, setStock] = useState("");
   const [description, setDescription] = useState("");
   const [imageUrl, setImageUrl] = useState("");
-  const [editId, setEditId] = useState<number | null>(null);
-  
+  const [editId, setEditId] = useState<string | null>(null);
+
   // UI states
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
-  
+
   // Filter & Search states
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
@@ -152,7 +152,6 @@ export default function AdminProductPage() {
         filtered.sort((a, b) => (a.stock ?? 0) - (b.stock ?? 0));
         break;
       default:
-        // newest - default order from API
         break;
     }
 
@@ -190,43 +189,29 @@ export default function AdminProductPage() {
   };
 
   const handleSave = async () => {
-    // Validasi input
-    if (!name.trim()) {
-      toast.error("Nama produk wajib diisi");
+    if (!name.trim() || !category || !price) {
+      toast.error("Nama, kategori, dan harga wajib diisi");
       return;
     }
-    if (!category) {
-      toast.error("Kategori wajib dipilih");
-      return;
-    }
-    if (!price || parseFloat(price) <= 0) {
-      toast.error("Harga harus lebih dari 0");
-      return;
-    }
-    if (stock && parseInt(stock) < 0) {
-      toast.error("Stok tidak boleh negatif");
-      return;
-    }
-
-    const payload = {
-      name: name.trim(),
-      category,
-      price: parseFloat(price),
-      stock: stock ? parseInt(stock) : 0,
-      description: description.trim() || null,
-      imageUrl: imageUrl.trim() || null,
-    };
 
     setLoading(true);
     try {
       const url = editId ? `/api/products/${editId}` : "/api/products";
       const method = editId ? "PUT" : "POST";
 
+      // Gunakan FormData agar sesuai dengan backend
+      const formData = new FormData();
+      formData.append("name", name);
+      formData.append("category", category);
+      formData.append("price", price);
+      formData.append("stock", stock || "0");
+      formData.append("description", description);
+      formData.append("imageUrl", imageUrl);
+
       const response = await fetch(url, {
         method,
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: formData, // ⬅️ ubah ini
       });
 
       if (!response.ok) {
@@ -234,9 +219,7 @@ export default function AdminProductPage() {
         throw new Error(data.error?.message || "Gagal menyimpan produk");
       }
 
-      toast.success(
-        editId ? "Produk berhasil diperbarui!" : "Produk berhasil ditambahkan!"
-      );
+      toast.success(editId ? "Produk diperbarui!" : "Produk ditambahkan!");
       closeModal();
       await fetchProducts();
     } catch (err) {
@@ -246,7 +229,7 @@ export default function AdminProductPage() {
     }
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: string) => {
     if (!confirm("Yakin ingin menghapus produk ini?")) return;
 
     setLoading(true);
@@ -305,10 +288,10 @@ export default function AdminProductPage() {
             onClick={() => router.push("/admin/dashboard")}
             className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors mb-4 group"
           >
-            <svg 
-              className="w-5 h-5 transform group-hover:-translate-x-1 transition-transform" 
-              fill="none" 
-              stroke="currentColor" 
+            <svg
+              className="w-5 h-5 transform group-hover:-translate-x-1 transition-transform"
+              fill="none"
+              stroke="currentColor"
               viewBox="0 0 24 24"
             >
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -430,9 +413,8 @@ export default function AdminProductPage() {
               <span>Filter</span>
               <ChevronDown
                 size={16}
-                className={`transition-transform ${
-                  showFilters ? "rotate-180" : ""
-                }`}
+                className={`transition-transform ${showFilters ? "rotate-180" : ""
+                  }`}
               />
             </button>
           </div>
@@ -555,7 +537,7 @@ export default function AdminProductPage() {
                       <Package className="w-16 h-16 text-gray-300" />
                     </div>
                   )}
-                  
+
                   {/* Stock Badge */}
                   {product.stock === 0 && (
                     <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded text-xs font-semibold">

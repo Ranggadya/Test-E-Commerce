@@ -10,10 +10,10 @@ import EmptyCategory from "@/components/empty-states/EmptyCategory";
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 
 type Product = {
-  id: number;
+  id: string;
   name: string;
   price: number;
-  category: string;
+  category: { name: string } | null;
   description: string | null;
   imageUrl: string | null;
 };

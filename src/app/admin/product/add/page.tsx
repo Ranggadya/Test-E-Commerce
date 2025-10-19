@@ -57,61 +57,47 @@ export default function AddProductPage() {
     const newStock = Math.max(0, currentStock + delta);
     setStock(newStock.toString());
   };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validation
-    if (!name.trim()) {
-      toast.error("Nama produk wajib diisi");
-      setCurrentStep(1);
-      return;
-    }
-
-    if (!category) {
-      toast.error("Kategori wajib dipilih");
-      setCurrentStep(1);
-      return;
-    }
-
-    if (!price || parseFloat(price) <= 0) {
-      toast.error("Harga harus lebih dari 0");
-      setCurrentStep(2);
-      return;
-    }
-
-    if (description.length > 500) {
-      toast.error("Deskripsi maksimal 500 karakter");
-      setCurrentStep(3);
+    // ✅ Validasi dasar
+    if (!name.trim() || !category || !price) {
+      toast.error("Nama, kategori, dan harga wajib diisi");
       return;
     }
 
     setLoading(true);
 
     try {
+      const formData = new FormData();
+      formData.append("name", name.trim());
+      formData.append("category", category);
+      formData.append("price", price);
+      formData.append("stock", stock || "0");
+      formData.append("description", description || "");
+      if (imageUrl) {
+        formData.append("imageUrl", imageUrl);
+      }
+
       const response = await fetch("/api/products", {
         method: "POST",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: name.trim(),
-          category,
-          price: parseFloat(price),
-          stock: stock ? parseInt(stock) : 0,
-          description: description.trim() || null,
-          imageUrl: imageUrl.trim() || null,
-        }),
+        body: formData,
       });
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({}));
-        throw new Error(error?.error?.message || "Gagal menambahkan produk");
+        throw new Error(error?.error || "Gagal menambahkan produk");
       }
 
+      const result = await response.json();
+
       toast.success("Produk berhasil ditambahkan!");
+      console.log("✅ Produk berhasil disimpan:", result);
       router.push("/admin/product");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Gagal menambahkan produk");
+      console.error("❌ Gagal menambahkan produk:", err);
+      toast.error(err instanceof Error ? err.message : "Terjadi kesalahan");
     } finally {
       setLoading(false);
     }
@@ -234,11 +220,10 @@ export default function AddProductPage() {
                       setCategory(cat.value);
                       if (currentStep < 2) setCurrentStep(2);
                     }}
-                    className={`p-4 border-2 rounded-lg text-left transition-all ${
-                      category === cat.value
-                        ? "border-blue-600 bg-blue-50"
-                        : "border-gray-200 hover:border-gray-300 bg-white"
-                    } ${loading ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+                    className={`p-4 border-2 rounded-lg text-left transition-all ${category === cat.value
+                      ? "border-blue-600 bg-blue-50"
+                      : "border-gray-200 hover:border-gray-300 bg-white"
+                      } ${loading ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
                     disabled={loading}
                   >
                     <div className="flex items-start gap-3">

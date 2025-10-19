@@ -6,7 +6,7 @@ import { formatCurrency } from "@/lib/utils/format";
 import WishlistButton from "./WishlistButton";
 
 type Product = {
-  id: number;
+  id: string;
   name: string;
   price: number;
   description: string | null;
@@ -20,16 +20,23 @@ export default function ProductCard({ product }: { product: Product }) {
     router.push(`/product/${product.id}`);
   };
 
+  const imageSrc =
+    product.imageUrl && product.imageUrl.startsWith("http")
+      ? product.imageUrl 
+      : "/placeholder.png"; 
+
   return (
     <div className="border rounded-2xl overflow-hidden bg-white shadow-sm hover:shadow-md transition duration-200">
       <div className="relative w-full h-56">
         <Image
-          src={product.imageUrl ?? "/sepatu1.jpeg"}
+          src={imageSrc}
           alt={product.name}
           fill
           className="object-cover"
           sizes="(min-width: 768px) 33vw, 100vw"
+          unoptimized 
         />
+
         {/* Wishlist Button */}
         <div className="absolute top-2 right-2 z-10">
           <WishlistButton productId={product.id} />
@@ -37,7 +44,7 @@ export default function ProductCard({ product }: { product: Product }) {
       </div>
 
       <div className="p-4">
-        <h3 className="font-semibold text-lg text-gray-900 mb-1">
+        <h3 className="font-semibold text-lg text-gray-900 mb-1 line-clamp-1">
           {product.name}
         </h3>
 

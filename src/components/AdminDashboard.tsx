@@ -3,12 +3,12 @@ import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { useAuth } from "./AuthProvider";
 import { useRouter } from "next/navigation";
-import { 
-  Search, 
-  Filter, 
-  Download, 
-  Eye, 
-  X, 
+import {
+  Search,
+  Filter,
+  Download,
+  Eye,
+  X,
   Calendar,
   DollarSign,
   Package,
@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 
 interface Product {
-  id: number;
+  id: string;
   name: string;
   category: string;
   price: number;
@@ -25,8 +25,8 @@ interface Product {
 }
 
 interface Order {
-  id: number;
-  userId: number;
+  id: string;
+  userId: string;
   user: {
     name: string;
     email: string;
@@ -52,11 +52,11 @@ interface Order {
 export default function AdminDashboard() {
   const { user, isLoading: authLoading } = useAuth();
   const router = useRouter();
-  
+
   // State produk & orders
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
-  
+
   // State umum
   const [activeTab, setActiveTab] = useState<"produk" | "status">("status");
   const [loading, setLoading] = useState(false);
@@ -104,7 +104,7 @@ export default function AdminDashboard() {
       }
 
       const data = await response.json();
-      setProducts(data.data?.items || []);
+      setProducts(data.data?.products || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Gagal memuat produk");
     } finally {
@@ -145,9 +145,9 @@ export default function AdminDashboard() {
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
         const matchesId = order.id.toString().includes(query);
-        const matchesCustomer = order.user.name.toLowerCase().includes(query) || 
-                               order.user.email.toLowerCase().includes(query);
-        const matchesProduct = order.items.some(item => 
+        const matchesCustomer = order.user.name.toLowerCase().includes(query) ||
+          order.user.email.toLowerCase().includes(query);
+        const matchesProduct = order.items.some(item =>
           item.product.name.toLowerCase().includes(query)
         );
         if (!matchesId && !matchesCustomer && !matchesProduct) {
@@ -196,8 +196,8 @@ export default function AdminDashboard() {
     totalRevenue: orders
       .filter(o => o.status !== "CANCELLED")
       .reduce((sum, o) => sum + o.totalAmount, 0),
-    averageOrderValue: orders.length > 0 
-      ? orders.reduce((sum, o) => sum + o.totalAmount, 0) / orders.length 
+    averageOrderValue: orders.length > 0
+      ? orders.reduce((sum, o) => sum + o.totalAmount, 0) / orders.length
       : 0,
   };
 
@@ -224,7 +224,7 @@ export default function AdminDashboard() {
     link.href = URL.createObjectURL(blob);
     link.download = `orders_${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
-    
+
     toast.success("Data berhasil diekspor!");
   };
 
@@ -238,7 +238,7 @@ export default function AdminDashboard() {
   };
 
   // Ganti status pesanan
-  const handleStatusChange = async (orderId: number, newStatus: string, currentStatus: string) => {
+  const handleStatusChange = async (orderId: string, newStatus: string, currentStatus: string) => {
     if (newStatus === currentStatus) {
       return; // No change
     }
@@ -246,7 +246,6 @@ export default function AdminDashboard() {
     if (!confirm(`Ubah status pesanan #${orderId} dari "${currentStatus}" menjadi "${newStatus}"?`)) return;
 
     try {
-      setLoading(true);
       const response = await fetch(`/api/orders/${orderId}`, {
         method: "PATCH",
         credentials: "include",
@@ -285,24 +284,22 @@ export default function AdminDashboard() {
       {/* Sidebar */}
       <aside className="w-64 bg-black text-white p-6 space-y-4">
         <h2 className="text-xl font-bold mb-4">Admin Panel</h2>
-        
+
         {/* Tab Navigation */}
         <div className="mb-6">
           <p className="text-xs text-gray-400 uppercase tracking-wider mb-2">Dashboard</p>
           <nav className="space-y-2">
             <button
               onClick={() => setActiveTab("status")}
-              className={`w-full px-3 py-2 rounded text-left transition-colors ${
-                activeTab === "status" ? "bg-gray-800" : "hover:bg-gray-800"
-              }`}
+              className={`w-full px-3 py-2 rounded text-left transition-colors ${activeTab === "status" ? "bg-gray-800" : "hover:bg-gray-800"
+                }`}
             >
               Status Pesanan
             </button>
             <button
               onClick={() => setActiveTab("produk")}
-              className={`w-full px-3 py-2 rounded text-left transition-colors ${
-                activeTab === "produk" ? "bg-gray-800" : "hover:bg-gray-800"
-              }`}
+              className={`w-full px-3 py-2 rounded text-left transition-colors ${activeTab === "produk" ? "bg-gray-800" : "hover:bg-gray-800"
+                }`}
             >
               Daftar Produk
             </button>
@@ -318,10 +315,10 @@ export default function AdminDashboard() {
               className="w-full px-3 py-2 rounded text-left hover:bg-gray-800 transition-colors flex items-center justify-between group"
             >
               <span>Kelola Produk</span>
-              <svg 
-                className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" 
-                fill="none" 
-                stroke="currentColor" 
+              <svg
+                className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity"
+                fill="none"
+                stroke="currentColor"
                 viewBox="0 0 24 24"
               >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -555,7 +552,7 @@ export default function AdminDashboard() {
                   <label className="text-sm font-semibold text-gray-900">Urutkan:</label>
                   <select
                     value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value as any)}
+                    onChange={(e) => setSortBy(e.target.value as "newest" | "oldest" | "amount-high" | "amount-low")}
                     className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-900 font-medium"
                   >
                     <option value="newest">Terbaru</option>
@@ -691,13 +688,12 @@ export default function AdminDashboard() {
                               </div>
                             </td>
                             <td className="p-3">
-                              <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
-                                order.status === "COMPLETED" ? "bg-green-100 text-green-800" :
-                                order.status === "SHIPPED" ? "bg-blue-100 text-blue-800" :
-                                order.status === "PROCESSING" ? "bg-yellow-100 text-yellow-800" :
-                                order.status === "CANCELLED" ? "bg-red-100 text-red-800" :
-                                "bg-gray-100 text-gray-800"
-                              }`}>
+                              <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${order.status === "COMPLETED" ? "bg-green-100 text-green-800" :
+                                  order.status === "SHIPPED" ? "bg-blue-100 text-blue-800" :
+                                    order.status === "PROCESSING" ? "bg-yellow-100 text-yellow-800" :
+                                      order.status === "CANCELLED" ? "bg-red-100 text-red-800" :
+                                        "bg-gray-100 text-gray-800"
+                                }`}>
                                 {order.status}
                               </span>
                             </td>
@@ -739,13 +735,12 @@ export default function AdminDashboard() {
                       <div className="bg-gray-800 px-4 py-3 flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <span className="font-mono text-sm font-bold text-white">#{order.id}</span>
-                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
-                            order.status === "COMPLETED" ? "bg-green-400 text-green-900" :
-                            order.status === "SHIPPED" ? "bg-blue-400 text-blue-900" :
-                            order.status === "PROCESSING" ? "bg-yellow-400 text-yellow-900" :
-                            order.status === "CANCELLED" ? "bg-red-400 text-red-900" :
-                            "bg-gray-400 text-gray-900"
-                          }`}>
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${order.status === "COMPLETED" ? "bg-green-400 text-green-900" :
+                              order.status === "SHIPPED" ? "bg-blue-400 text-blue-900" :
+                                order.status === "PROCESSING" ? "bg-yellow-400 text-yellow-900" :
+                                  order.status === "CANCELLED" ? "bg-red-400 text-red-900" :
+                                    "bg-gray-400 text-gray-900"
+                            }`}>
                             {order.status}
                           </span>
                         </div>
